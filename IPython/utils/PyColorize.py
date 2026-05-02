@@ -8,7 +8,7 @@ from io import StringIO
 from typing import Any, Type, TypeAlias
 
 import pygments
-from pygments.formatters.terminal256 import Terminal256Formatter
+from pygments.formatters.terminal256 import TerminalTrueColorFormatter
 from pygments.style import Style
 from pygments.styles import get_style_by_name
 from pygments.token import Token, _TokenType
@@ -55,7 +55,7 @@ class Theme:
         self.extra_style = extra_style
         s: Symbols = symbols if symbols is not None else _default_symbols
         self.symbols = {**_default_symbols, **s}
-        self._formatter = Terminal256Formatter(style=self.as_pygments_style())
+        self._formatter = TerminalTrueColorFormatter(style=self.as_pygments_style())
 
     @cache
     def as_pygments_style(self) -> Type[Style]:

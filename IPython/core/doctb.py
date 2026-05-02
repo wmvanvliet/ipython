@@ -7,7 +7,7 @@ from typing import Any, Optional
 from collections.abc import Callable
 
 import stack_data
-from pygments.formatters.terminal256 import Terminal256Formatter
+from pygments.formatters.terminal256 import TerminalTrueColorFormatter
 from pygments.token import Token
 
 from IPython.utils.PyColorize import Theme, TokenStream, theme_table
@@ -331,7 +331,7 @@ class DocTB(TBTools):
         if self.has_colors:
             base_style = theme_table[self._theme_name].as_pygments_style()
             style = stack_data.style_with_executing_node(base_style, self.tb_highlight)
-            formatter = Terminal256Formatter(style=style)
+            formatter = TerminalTrueColorFormatter(style=style)
         else:
             formatter = None
         options = stack_data.Options(
