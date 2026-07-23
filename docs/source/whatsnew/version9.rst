@@ -2,6 +2,224 @@
  9.x Series
 ============
 
+.. _version 9.15:
+
+IPython 9.15
+------------
+
+Summary
+~~~~~~~
+
+This release adds a new ``%xmode Doctest`` (:ghpull:`15185`) traceback mode and a number of
+robustness fixes around startup, history storage, the debugger, and the Sphinx
+directive. It also contains one backwards-incompatible change to ``%run`` glob
+expansion and one deprecation.
+
+- :ghpull:`15220` Fix ``%debug`` and ipdb with Python 3.15
+- :ghpull:`15219` Add ``exception`` as an alias for the ``exceptions`` pdb command
+- :ghpull:`15236` Hide ``execfile`` internals in debugger backtraces
+- :ghissue:`15072`/:ghpull:`15246` Fix oinspect ``TypeError`` with objects using a generic ``__getattr__``
+- :ghpull:`15249` Skip ipython directive execution inside excluded ``only`` blocks
+- :ghissue:`15241`/:ghpull:`15255` Close SQLite connections before replacing the history database
+- :ghissue:`15068`/:ghpull:`15255` Deprecate ``IPython.utils.generics.inspect_object``
+
+
+- :ghpull:`15242` Use ``print_stack_entry`` to print frames on Python 3.14
+- :ghpull:`15247` Avoid ``psutil`` requirement on Cygwin
+- :ghpull:`15252` Narrow bare ``except:`` clauses in oinspect and interactiveshell
+- :ghpull:`15253` Remove Python 2 references and fix links in the documentation
+- :ghpull:`15254` Remove stale TODO comment in ``DisplayObject.reload``
+- :ghissue:`15100` Fix test failures when the IPython source path contains spaces
+- :ghissue:`15193` Honor PEP 263 coding cookies when reading sources in autoreload
+- :ghissue:`12726` Quoted arguments to ``%run`` no longer undergo glob expansion
+- :ghissue:`11424` Strip ANSI escape sequences from Sphinx directive output
+- :ghissue:`14538` Hide ``execfile`` frames in debugger backtraces
+
+
+Doctest Traceback Mode
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+A new ``%xmode Doctest`` mode formats tracebacks for easy copy-paste into
+Python doctests. The output shows only the traceback header, a literal
+ellipsis, and the exception line::
+
+    Traceback (most recent call last):
+        ...
+    ZeroDivisionError: division by zero
+
+
+Robust Startup and Terminal Detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Kitty graphics protocol detection walks the process tree with ``psutil``
+at import time. On shared multi-user systems where ``/proc`` is mounted with
+``hidepid`` (common on HPC clusters), reaching an ancestor process owned by
+another user raised ``psutil.AccessDenied``, which was unhandled and aborted
+the entire ``import IPython``. Such errors are now caught and treated as
+"graphics unsupported"; detection capability for the user's own terminals is
+unchanged.
+
+``psutil`` is also no longer required on Cygwin, where it is not available
+(:ghpull:`15247`).
+
+
+History Storage Robustness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``sqlite3.Connection`` used as a context manager only commits or rolls back;
+it does not close the connection. ``ipython history trim`` and
+``ipython history clear`` therefore still held open handles on
+``history.sqlite`` when unlinking and renaming it, which failed with
+``PermissionError`` on Windows and left ``history.sqlite.new*`` files behind.
+The connections are now closed before any file shuffling (:ghissue:`15241`).
+
+
+Debugger Fixes
+~~~~~~~~~~~~~~
+
+- ``%debug`` and ipdb work again under Python 3.15, and frames are printed with
+  ``print_stack_entry`` on Python 3.14 (:ghpull:`15220`, :ghpull:`15242`).
+- ``execfile`` internals are now marked as the ``__ipython_bottom__`` traceback
+  boundary, so the file runner and the frames above it are hidden as IPython
+  internals while user script frames stay visible (:ghpull:`15236`,
+  :ghissue:`14538`).
+- ``exception`` is now accepted as an alias for the ``exceptions`` pdb command
+  (:ghpull:`15219`).
+
+
+Inspection (``?``) Fix
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Objects whose ``__getattr__`` returns something other than a ``dict`` for
+``__custom_documentations__`` (e.g. a polars ``Expr``, which returns a new
+``Expr`` for any attribute name) no longer raise a ``TypeError`` when inspected
+with ``?`` or :func:`%pinfo`. The lookup is now guarded with ``isinstance(...,
+dict)`` (:ghissue:`15072`).
+
+
+Autoreload Encoding Fix
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The autoreload diffing logic now reads module sources with ``tokenize.open``,
+honoring PEP 263 coding cookies the way the import system does, instead of
+assuming UTF-8. Sources declaring another encoding were previously read as
+empty, silently disabling hot-patching for those modules (:ghissue:`15193`).
+
+
+Sphinx Directive Fixes
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The IPython Sphinx directive now strips ANSI escape sequences from executed
+code-block output, so tracebacks and other colored output no longer appear as
+garbled text in rendered HTML/PDF documentation (:ghissue:`11424`). Execution
+is also now skipped inside excluded ``only`` blocks (:ghpull:`15249`).
+
+
+Backwards incompatible changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Wrapping a ``%run`` argument in single or double quotes now suppresses glob
+expansion of that argument, matching real shells. Previously quoting was
+documented as *not* suppressing expansion, which was surprising. For example
+with ``foo.txt`` and ``bar.txt`` in the working directory::
+
+    %run script.py "*.txt"    # before: ['foo.txt', 'bar.txt']
+                              # after:  ['*.txt']
+
+The unquoted form (``%run script.py *.txt``) and the backslash-escape form
+(``%run script.py \*.txt``) are unchanged. Pass ``-G`` to disable expansion
+entirely (:ghissue:`12726`).
+
+
+Deprecations
+~~~~~~~~~~~~
+
+``IPython.utils.generics.inspect_object`` is deprecated since IPython 9.15 and
+will be removed in a future version. It is no longer used within IPython, so
+registering handlers on it has no effect. ``complete_object`` is unaffected
+(:ghissue:`15068`).
+
+
+Thanks
+~~~~~~
+
+Thanks as well to the `D. E. Shaw group <https://deshaw.com/>`_ for sponsoring
+work on IPython.
+
+As usual, you can find the full list of PRs on GitHub under `the 9.15
+<https://github.com/ipython/ipython/milestone/165?closed=1>`__ milestone.
+
+
+.. _version 9.14:
+
+IPython 9.14
+------------
+
+Summary
+~~~~~~~
+
+This release is mostly a maintenance release, with fixes for SQLite history
+handling, terminal image rendering, reproducible banner output, Pyodide
+support, and a number of documentation improvements.
+
+- :ghpull:`15204` Fix history memory fallback after SQLite lock
+- :ghpull:`15208` Fix banner customization when ``SOURCE_DATE_EPOCH`` is set
+- :ghpull:`15196` Handle stdout without ``isatty`` in kitty support check
+- :ghpull:`15190` Avoid ``psutil`` requirement on emscripten
+- :ghpull:`15206` Accept singular pdb exception command
+- :ghpull:`15203` Fix incorrect ``Configuration`` type import
+- :ghpull:`15179` Copyedit ``prompt_line_number_format`` description
+- :ghpull:`15209` Fix typos in user-facing documentation
+- :ghpull:`15211` Fix duplicated words in ``usage.py`` and ``oinspect.py`` docstrings
+- :ghpull:`15215` Fix terminal title config description
+- :ghpull:`15218` Fix broken 'Edit on GitHub' link for auto-generated API docs
+- :ghpull:`15224` Fix docstring formatting for ``prompt_line_number_format`` help text
+
+
+SQLite History Fallback Fix
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When file-backed SQLite history could not create a new session (for example
+because the ``history.sqlite`` file was locked by another running session), the
+fallback only changed ``hist_file`` to ``:memory:`` while the existing
+connection still pointed at the locked on-disk database. Later history writes
+could therefore keep raising ``sqlite3.OperationalError: database is locked``.
+The fallback now closes the current connection, switches to an in-memory
+database, and creates a fresh history session there (:ghpull:`15204`).
+
+
+Reproducible Banner Output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Banner customization now honors the ``SOURCE_DATE_EPOCH`` environment variable,
+fixing reproducible-build setups that pin the date (:ghpull:`15208`).
+
+
+Terminal Image Rendering Robustness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Kitty graphics protocol support check now handles the case where ``stdout``
+has no ``isatty`` method, avoiding an ``AttributeError`` in some embedded or
+redirected-output environments (:ghpull:`15196`).
+
+
+Pyodide / Emscripten Support
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+IPython no longer requires ``psutil`` on the emscripten platform, where it is
+not available (:ghpull:`15190`).
+
+
+Thanks
+~~~~~~
+
+Thanks as well to the `D. E. Shaw group <https://deshaw.com/>`_ for sponsoring
+work on IPython.
+
+As usual, you can find the full list of PRs on GitHub under `the 9.14
+<https://github.com/ipython/ipython/milestone/164?closed=1>`__ milestone.
+
+
 .. _version 9.13:
 
 IPython 9.13
@@ -614,7 +832,7 @@ IPython 9.0
 -----------
 
 Welcome to IPython 9.0. As with any version of IPython before this release, it
-should not be majorly different from the previous version, at least on the surface. 
+should not be majorly different from the previous version, at least on the surface.
 We still hope you can upgrade as soon as possible and look forward to your feedback.
 
 I take the opportunity of this new release to remind you that IPython is
@@ -635,9 +853,9 @@ Here is a relevant extract from the COC.
 As a short overview of the changes in 9.0, we have over 100 PRs merged since 8.x,
 many of which are refactors, cleanups and simplifications.
 
- - (optional) LLM integration in the CLI. 
- - Complete rewrite of color and theme handling, which now supports more colors and symbols. 
- - Move tests out of tree in the wheel with a massive reduction in file size. 
+ - (optional) LLM integration in the CLI.
+ - Complete rewrite of color and theme handling, which now supports more colors and symbols.
+ - Move tests out of tree in the wheel with a massive reduction in file size.
  - Tips at startup
  - Removal of (almost) all deprecated functionalities and options.
  - Stricter and more stable codebase.
@@ -646,10 +864,10 @@ many of which are refactors, cleanups and simplifications.
 Removal and deprecation
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-I am not going to list the removals and deprecations, but anything deprecated since before IPython 8.16 is gone, 
-including many shim modules and indirect imports that would just re-expose IPykernel, qtconsole, etc. 
+I am not going to list the removals and deprecations, but anything deprecated since before IPython 8.16 is gone,
+including many shim modules and indirect imports that would just re-expose IPykernel, qtconsole, etc.
 
-A number of new deprecations have been added (run your test suites with `-Werror`), as those will be removed in the future. 
+A number of new deprecations have been added (run your test suites with `-Werror`), as those will be removed in the future.
 
 
 Color and theme rewrite
@@ -657,15 +875,15 @@ Color and theme rewrite
 
 IPython's color handling had grown many options through the years, and it was
 quite entrenched in the codebase, directly emitting ansi escape sequences deep
-in traceback printing and other places. 
+in traceback printing and other places.
 
 This made developing new color schemes difficult, and limited us to the 16 colors
-of the original ansi standard defined by your terminal. 
+of the original ansi standard defined by your terminal.
 
 Syntax highlighting was also inconsistent, and not all syntax elements were
 always using the same theme.
 
-Using (style, token) pairs 
+Using (style, token) pairs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Starting with 9.0, the color and theme handling has been rewritten, and
@@ -678,7 +896,7 @@ formats these objects at the last moment, using the current theme.
 
 This means that new themes can now use all of pygments's color names and
 functionalities, and you can define for each token style, the foreground,
-background, underline, bold, italic and likely a few other options. 
+background, underline, bold, italic and likely a few other options.
 
 In addition, themes now provide a number of `symbols`, that can be used when
 rendering traceback or debugger prompts. This let you customize the appearance a
@@ -693,7 +911,7 @@ New themes using colors and symbols
 All the existing themes (Linux, LightBG, Neutral and NoColor) should not see any
 changes, but I added two new *pride themes*, that show the use of 256bits colors
 and unicode symbols. I'm not a designer, so feel free to suggest updates and new
-themes to add. 
+themes to add.
 
 Themes  currently still require writing a bit of Python, but I hope to get
 contributions for IPython to be able to load them from text files, for easier
@@ -703,8 +921,8 @@ Tips at startup
 ~~~~~~~~~~~~~~~
 
 IPython now displays a few tips at startup (1 line), to help you discover new features.
-All those are in the codebase, and can be displayed randomly or based on date. 
-You can disable it via a configuration option or the ``--no-tips`` flag. 
+All those are in the codebase, and can be displayed randomly or based on date.
+You can disable it via a configuration option or the ``--no-tips`` flag.
 
 Please contribute more tips by sending pull requests!
 
@@ -736,7 +954,7 @@ be set to work:
    to trigger ``llm_autosuggestion`` only while typing.
 
 .. code::
-   
+
    c.TerminalInteractiveShell.shortcuts = [
         {
             "new_keys": ["c-q"],
@@ -767,6 +985,3 @@ Thanks to everyone who helped with the 9.0 release and working toward 9.0.
 
 As usual you can find the full list of PRs on GitHub under `the 9.0
 <https://github.com/ipython/ipython/milestone/138?closed=1>`__ milestone.
-
-
-

@@ -7,7 +7,7 @@ History
 Origins
 =======
 
-IPython was starting in 2001 by Fernando Perez while he was a graduate student
+IPython was started in 2001 by Fernando Pérez while he was a graduate student
 at the University of Colorado, Boulder. IPython as we know it today grew out
 of the following three projects:
 
@@ -31,4 +31,3 @@ Here is how Fernando describes the early history of IPython:
     prompt history and great object introspection and help facilities. I
     think it worked reasonably well, though it was a lot more work than I
     had initially planned.
-

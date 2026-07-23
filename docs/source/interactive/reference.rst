@@ -23,8 +23,8 @@ will only execute one file and ignore your configuration setup.
 Please note that some of the configuration options are not available at the
 command line, simply because they are not practical here. Look into your
 configuration files for details on those. There are separate configuration files
-for each profile, and the files look like :file:`ipython_config.py` or
-:file:`ipython_config_{frontendname}.py`.  Profile directories look like
+for each profile, and the files look like :file:`ipython_config.py` (or
+:file:`ipython_kernel_config.py` for the kernel).  Profile directories look like
 :file:`profile_{profilename}` and are typically installed in the
 :envvar:`IPYTHONDIR` directory, which defaults to :file:`$HOME/.ipython`. For
 Windows users, :envvar:`HOME` resolves to :file:`C:\\Users\\{YourUserName}` in
@@ -345,8 +345,8 @@ exclamation marks (``!!ls``) or the :magic:`sx` magic command without an assignm
 
 The captured list in this example has some convenience features. ``myfiles.n`` or ``myfiles.s``
 returns a string delimited by newlines or spaces, respectively. ``myfiles.p``
-produces `path objects <http://pypi.python.org/pypi/path.py>`_ from the list items.
-See :ref:`string_lists` for details.
+produces :class:`pathlib.Path` objects for the list items which exist on the
+filesystem. See :ref:`string_lists` for details.
 
 IPython also allows you to expand the value of python variables when
 making system calls. Wrap variables or expressions in {braces}::
@@ -422,7 +422,7 @@ to parse visually.
 See the magic :magic:`xmode` and :magic:`colors` functions for details.
 
 These features are basically a terminal version of Ka-Ping Yee's cgitb
-module, now part of the standard Python library.
+module, formerly part of the standard Python library.
 
 
 .. _input_caching:
@@ -552,7 +552,10 @@ but this will work::
 
     In [5]: /zip (1,2,3),(4,5,6)
     ------> zip ((1,2,3),(4,5,6))
-    Out[5]: [(1, 4), (2, 5), (3, 6)]
+    Out[5]: <zip at 0x7f0e19dc1c80>
+
+    In [6]: list(_)
+    Out[6]: [(1, 4), (2, 5), (3, 6)]
 
 IPython tells you that it has altered your command line by displaying
 the new command line preceded by ``--->``.
@@ -707,7 +710,7 @@ You can also embed an IPython *kernel*, for use with qtconsole, etc. via::
     embed_kernel()
 
 This should work the same way, but you can connect an external frontend
-(``ipython qtconsole`` or ``ipython console``),
+(``jupyter qtconsole`` or ``jupyter console``),
 rather than interacting with it in the terminal.
 
 You can run embedded instances even in code which is itself being run at
@@ -722,7 +725,7 @@ them separately, for example with different options for data
 presentation. If you close and open the same instance multiple times,
 its prompt counters simply continue from each execution to the next.
 
-Please look at the docstrings in the :mod:`~IPython.frontend.terminal.embed`
+Please look at the docstrings in the :mod:`~IPython.terminal.embed`
 module for more details on the use of this system.
 
 The following sample file illustrating how to use the embedding
@@ -898,16 +901,16 @@ command, or you can start IPython with the ``--pdb`` option.
 For a post-mortem debugger in your programs outside IPython,
 put the following lines toward the top of your 'main' routine::
 
-    # TODO: theme
     import sys
     from IPython.core import ultratb
     sys.excepthook = ultratb.FormattedTB(mode='Verbose',
-    color_scheme='Linux', call_pdb=1)
+    theme_name='linux', call_pdb=1)
 
-The mode keyword can be either 'Verbose' or 'Plain', giving either very
-detailed or normal tracebacks respectively. The color_scheme keyword can
-be one of 'nocolor', 'linux' (default) or 'lightbg'. These are the same
-options which can be set in IPython with ``--colors`` and ``--xmode``.
+The mode keyword can be 'Plain', 'Context', 'Verbose' or 'Minimal', giving
+increasingly detailed tracebacks. The theme_name keyword can be the name of
+any IPython theme, e.g. 'nocolor', 'linux' (default), 'lightbg' or 'neutral'.
+These are the same options which can be set in IPython with ``--theme`` and
+the :magic:`xmode` magic.
 
 This will give any of your programs detailed, colored tracebacks with
 automatic invocation of pdb.

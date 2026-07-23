@@ -1,4 +1,5 @@
 """Implementation of basic magic functions."""
+from __future__ import annotations
 
 
 from logging import error
@@ -170,13 +171,13 @@ class BasicMagics(Magics):
 
         if args.line:
             mman.register_alias(name, target, 'line', params)
-            print('Created `%s%s` as an alias for `%s%s%s`.' % (
+            print('Created `{}{}` as an alias for `{}{}{}`.'.format(
                 magic_escapes['line'], name,
                 magic_escapes['line'], target, params_str))
 
         if args.cell:
             mman.register_alias(name, target, 'cell', params)
-            print('Created `%s%s` as an alias for `%s%s%s`.' % (
+            print('Created `{}{}` as an alias for `{}{}{}`.'.format(
                 magic_escapes['cell'], name,
                 magic_escapes['cell'], target, params_str))
 
@@ -344,7 +345,7 @@ Currently the magic system has the following functions:""",
     def xmode(self, parameter_s=''):
         """Switch modes for the exception handlers.
 
-        Valid modes: Plain, Context, Verbose, Minimal, and Docs.
+        Valid modes: Plain, Context, Verbose, Minimal, Docs, and Doctest.
 
         - ``Plain``: similar to Python's default traceback.
         - ``Context``: shows several lines of surrounding context for each
@@ -355,6 +356,8 @@ Currently the magic system has the following functions:""",
           a traceback.
         - ``Docs``: a stripped-down version of Verbose, designed for use
           when running doctests.
+        - ``Doctest``: shows only the traceback header, an ellipsis, and the
+          exception line, for easy copy-paste into Python doctests.
 
         If called without arguments, cycles through the available modes.
 
@@ -379,8 +382,7 @@ Currently the magic system has the following functions:""",
         try:
             shell.InteractiveTB.set_mode(mode=new_mode)
             print('Exception reporting mode:',shell.InteractiveTB.mode)
-        except:
-            raise
+        except Exception:
             xmode_switch_err('user')
 
     @line_magic
@@ -666,8 +668,17 @@ Currently the magic system has the following functions:""",
         # Sign the notebook to make it trusted
         notary = NotebookNotary()
         notary.update_config(self.shell.config)
-        notary.sign(nb)
-        with io.open(outfname, "w", encoding="utf-8") as f:
+        try:
+            notary.sign(nb)
+        finally:
+            # Close the signature store's SQLite connection. NotebookNotary
+            # opens it eagerly but never closes it on its own, so leaving it
+            # open lets the connection be garbage collected unclosed, raising a
+            # spurious "ResourceWarning: unclosed database" in whatever code
+            # happens to be running at collection time (a source of flaky test
+            # failures, notably on the Windows / Python 3.14 CI job).
+            notary.store.close()
+        with open(outfname, "w", encoding="utf-8") as f:
             write(nb, f, version=4)
 
     def _get_kernel_language_info(self) -> dict | None:

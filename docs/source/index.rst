@@ -18,7 +18,7 @@ interactively.  Its main components are:
 
 
     .. image:: ./_images/ipython-6-screenshot.png
-        :alt: Screenshot of IPython 6.0
+        :alt: Screenshot of IPython running in a terminal
         :align: center
 
 
@@ -55,10 +55,10 @@ features:
 * Integrated access to the pdb debugger and the Python profiler.
 
 
-The Command line interface inherits the above functionality and adds 
- 
+The Command line interface inherits the above functionality and adds
+
 * real multi-line editing thanks to `prompt_toolkit <https://python-prompt-toolkit.readthedocs.io/en/stable/>`_.
- 
+
 * syntax highlighting as you type.
 
 * integration with command line editor for a better workflow.
@@ -66,8 +66,8 @@ The Command line interface inherits the above functionality and adds
 The kernel also has its share of features. When used with a compatible frontend,
 it allows:
 
-* the object to create a rich display of Html, Images, Latex, Sound and
-  Video.
+* objects to create rich displays of HTML, images, LaTeX, sound and
+  video.
 
 * interactive widgets with the use of the `ipywidgets <https://ipywidgets.readthedocs.io/en/stable/>`_ package.
 
@@ -77,7 +77,7 @@ command line and kernel, as well as describe the internal mechanisms in order
 to improve your Python workflow.
 
 You can find the table of content for this documentation in the left
-sidebar, allowing you to come back to previous sections or skip ahead, if needed. 
+sidebar, allowing you to come back to previous sections or skip ahead, if needed.
 
 
 The latest development version is always available from IPython's `GitHub
@@ -113,4 +113,3 @@ repository <https://github.com/ipython/ipython>`_.
    * :ref:`genindex`
    * :ref:`modindex`
    * :ref:`search`
-

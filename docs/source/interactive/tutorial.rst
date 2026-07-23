@@ -66,8 +66,8 @@ the position of the cursor by using :kbd:`Ctrl-o`.
 The four most helpful commands
 ==============================
 
-The four most helpful commands, as well as their brief description, is shown
-to you in a banner, every time you start IPython:
+Four commands are especially helpful; the banner shown every time you start
+IPython points you to the first one (``?``):
 
 ==========    =========================================================
 command       description
@@ -86,8 +86,8 @@ structure of any object you're dealing with. Simply type ``object_name.<TAB>``
 to view the object's attributes. Besides Python objects and keywords, tab
 completion also works on file and directory names.
 
-If ``jedi`` is installed, IPython will try to pull completions from Jedi as
-well. This allows to not only inspect currently existing objects, but also to
+IPython also pulls completions from ``jedi`` (installed as one of its
+dependencies). This allows to not only inspect currently existing objects, but also to
 infer completion statically without executing code. There is nothing particular
 needed to get this to work, simply use tab completion on more complex
 expressions like the following::
@@ -126,7 +126,7 @@ an argument not only the rest of the line, but also the lines below it in a
 separate argument.
 
 Magics are useful as convenient functions where Python syntax is not the most
-natural one, or when one want to embed invalid python syntax in their work flow. 
+natural one, or when one want to embed invalid python syntax in their work flow.
 
 The following examples show how to call the built-in :magic:`timeit` magic, both
 in line and cell mode::
@@ -136,7 +136,7 @@ in line and cell mode::
 
       In [2]: %%timeit x = range(10000)
       ...: max(x)
-      ...: 
+      ...:
       264 µs ± 1 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
 
 The built-in magics include:
@@ -169,8 +169,6 @@ read its docstring. To see all the available magic functions, call
     The :ref:`magic` section of the documentation goes more in depth into how
     the magics works and how to define your own, and :doc:`magics` for a list of
     built-in magics.
-
-    `Cell magics`_ example notebook
 
 Running and Editing
 -------------------
@@ -220,12 +218,12 @@ You can use the ``%history`` magic function to examine past input and output.
 Input history from previous sessions is saved in a database, and IPython can be
 configured to save output history.
 
-Several other magic functions can use your input history, including ``%edit``, 
+Several other magic functions can use your input history, including ``%edit``,
 ``%rerun``, ``%recall``, ``%macro``, ``%save`` and ``%pastebin``. You can use a
 standard format to refer to lines::
 
     %pastebin 3 18-20 ~1/1-5
-    
+
 This will take line 3 and lines 18 to 20 from the current session, and lines
 1-5 from the previous session.
 
@@ -235,7 +233,7 @@ System shell commands
 To run any command at the system shell, simply prefix it with ``!``, e.g.::
 
     !ping www.bbc.co.uk
-    
+
 You can capture the output into a Python list, e.g.: ``files = !ls``. To pass
 the values of Python variables or expressions to system commands, prefix them
 with $: ``!grep -rF $pattern ipython/*`` or wrap in `{braces}`. See :ref:`our

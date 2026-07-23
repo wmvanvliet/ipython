@@ -7,7 +7,7 @@ Installing IPython
 IPython requires Python ≥ 3.11.
 
 
-Quick Install 
+Quick Install
 -------------
 
 With ``pip`` already installed :
@@ -28,7 +28,7 @@ Overview
 
 This document describes in detail the steps required to install IPython. For a
 few quick ways to get started with package managers or full Python
-distributions, see `the install page <https://ipython.org/install.html>`_ of the
+distributions, see `the install page <https://ipython.org/install>`_ of the
 IPython website.
 
 Please let us know if you have problems installing IPython or any of its
@@ -83,7 +83,7 @@ Optional: Command-line completion
 
 IPython supports command-line completion via the ``argcomplete`` package.
 To enable tab completion for IPython and other Python programs that support
-argcomplete, install IPython with the ``terminal`` extra:
+argcomplete, install IPython with the ``all`` extra:
 
 .. code-block:: bash
 
@@ -111,7 +111,7 @@ Installing the development version
 
 It is also possible to install the development version of IPython from our
 `Git <https://git-scm.com/>`_ source code repository.  To do this you will
-need to have Git installed on your system.  
+need to have Git installed on your system.
 
 
 Then do:

@@ -16,7 +16,8 @@ Requirements
 
 The documentation must be built using Python 3.
 
-In addition to :ref:`devinstall`,
+In addition to `installing the development version
+<https://ipython.readthedocs.io/en/latest/install/install.html#installing-the-development-version>`__,
 the following tools are needed to build the documentation:
 
  - sphinx
@@ -43,8 +44,6 @@ docs. When you are working on the narrative documentation, the most time
 consuming portion  of the build process is the processing and rendering of the
 API documentation. This build target skips that.
 
-``make pdf`` will compile a pdf from the documentation.
-
 You can run ``make help`` to see information on all possible make targets.
 
 To save time,
@@ -53,12 +52,13 @@ previous docs build.
 To remove the previous docs build you can use ``make clean``.
 You can also combine ``clean`` with other `make` commands;
 for example,
-``make clean html`` will do a complete rebuild of the docs or ``make clean pdf`` will do a complete build of the pdf.
+``make clean html`` will do a complete rebuild of the docs.
 
 
 Continuous Integration
 ----------------------
 
-Documentation builds are included in the Travis-CI continuous integration process,
-so you can see the results of the docs build for any pull request at
-https://travis-ci.org/ipython/ipython/pull_requests.
+Documentation builds are included in the GitHub Actions continuous integration
+process (see ``.github/workflows/docs.yml``), and the documentation is built
+on ReadTheDocs for every pull request, so you can preview the rendered result
+from the pull request's checks.

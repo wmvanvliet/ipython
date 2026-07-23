@@ -17,16 +17,16 @@ multiple configuration options to be set to properly work:
 
  - Set a keybinding to trigger LLM suggestions. Due to terminal limitations
    across platforms and emulators, it is difficult to provide a default
-   keybinding. Note that not all keybindings are availables, in particular all
+   keybinding. Note that not all keybindings are available, in particular all
    the `Ctrl-Enter`, `Alt-backslash` and `Ctrl-Shift-Enter` are not available
    without integration with your terminal emulator.
 
- - Chose a LLM `provider`, usually from Jupyter-AI. This will be the interface
-   between IPython itself, and the LLM – that may be local or in on a server.
+ - Choose an LLM `provider`, usually from Jupyter-AI. This will be the interface
+   between IPython itself, and the LLM – that may be local or on a server.
 
  - Configure said provider with models, API keys, etc – this will depend on the
    provider, and you will have to refer to Jupyter-AI documentation, and/or your
-   LLM documenatation.
+   LLM documentation.
 
 
 While setting up IPython to use a real LLM, you can refer to
@@ -40,12 +40,12 @@ Setup a keybinding
 
 You may want to refer on how to setup a keybinding in IPython, but in short you
 want to bind the ``IPython:auto_suggest.llm_autosuggestion`` command to a
-keybinding, and have it active only when the default buffer isi focused, and
-when using the NavigableSuggestions suggestter (this is the default suggestter,
-the one that is history and LLM aware). Thus the ``navigable_suggestions &
-default_buffer_focused`` filter should be used.
+keybinding, and have it active only when the default buffer is focused, and
+when using the ``NavigableAutoSuggestFromHistory`` suggester (this is the
+default suggester, the one that is history and LLM aware). Thus the
+``navigable_suggestions & default_buffer_focused`` filter should be used.
 
-Usually ``Ctrl-Q`` on macos is an available shortcut, note that is does use
+Usually ``Ctrl-Q`` on macOS is an available shortcut, note that it does use
 ``Ctrl``, and not ``Command``.
 
 The following example will bind ``Ctrl-Q`` to the ``llm_autosuggestion``
@@ -81,14 +81,14 @@ In your configuration file adapt the following line to your needs:
 Configure the provider
 ----------------------
 
-It the provider needs to be passed parameters at initialization, you can do so
-by setting the ``llm_construction_kwargs`` traitlet.
+If the provider needs to be passed parameters at initialization, you can do so
+by setting the ``llm_constructor_kwargs`` traitlet.
 
 .. code-block:: python
 
     c.TerminalInteractiveShell.llm_constructor_kwargs = {"model": "skynet"}
 
-This will depdend on the provider you chose, and you will have to refer to
+This will depend on the provider you chose, and you will have to refer to
 the provider documentation.
 
 Extra configuration may be needed by setting environment variables, this will
@@ -185,7 +185,7 @@ shell:
 
     /home/bob >>> # it works
 
-See ``IPython/example/utils/cwd_prompt.py`` for an example of how to write
+See ``examples/utils/cwd_prompt.py`` for an example of how to write
 extensions to customise prompts.
 
 Inside IPython or in a startup script, you can use a custom prompts class
@@ -213,7 +213,7 @@ as **themes**. A Theme can do a bit more than purely colors, as it can handle
 bold, italic and basically any style that ``pygments`` support.  Themes also
 support a number of ``Symbols``, which allows you to – for example – change the
 shape of the arrow that mark the current frame and line numbers in the debugger
-and the tracebacks. 
+and the tracebacks.
 
 Most of the various IPython options that were used pre 9.0 have been renamed,
 with a exceptions a few, and most classes  that deal with themes can, now take a
@@ -221,23 +221,23 @@ with a exceptions a few, and most classes  that deal with themes can, now take a
 
 To reflect this, the  ``--colors`` flag now is also aliased to ``--theme``.
 
-The default themes included are the same, except lowercase, for ease of typing. 
+The default themes included are the same, except lowercase, for ease of typing.
 
 ``'nocolor', 'neutral', 'linux', 'lightbg', 'gruvbox-dark'``, with the addition of ``'pride'``
 to celebrate the inclusively of this project (I welcome update to the pride
-theme as I'm not a designer myself). 
+theme as I'm not a designer myself).
 
 In addition, the ``--theme=pride`` theme, is the first to make use of unicode
-symbols for the traceback separation line, and the debugger and traceback arrow, 
+symbols for the traceback separation line, and the debugger and traceback arrow,
 as well as making some use of ``bold``, and ``italic`` formatting, and not limit
 itself to the 16 base ANSI colors.
 
 Theme details
 -------------
 
-We encourage you to contribute themes, and to distribute them, 
+We encourage you to contribute themes, and to distribute them,
 while currently you need to modify source code to add a theme, it should be
-possible to load theme from Json, Yaml, or any other declarative file type. 
+possible to load theme from Json, Yaml, or any other declarative file type.
 
 Since IPython 9.0, most of IPython internal code emit a sequence of `(Token
 Type, string)`, which is fed through pygments, and a theme is mapping from those
@@ -442,14 +442,14 @@ IPython configuration::
 
             if text.startswith('!') or text.startswith('%'): # execute the input...
 
-                buffer.accept_action.validate_and_handle(event.cli, buffer)
+                buffer.validate_and_handle()
 
             else: # insert a newline with auto-indentation...
 
                 if document.line_count > 1: text = text[:document.cursor_position]
                 indent = shell.check_complete(text)[1]
                 buffer.insert_text('\n' + indent)
-            
+
                 # if you just wanted a plain newline without any indentation, you
                 # could use `buffer.insert_text('\n')` instead of the lines above
 

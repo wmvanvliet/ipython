@@ -5,10 +5,8 @@ IPython Tips & Tricks
 =====================
 
 The `IPython cookbook
-<https://github.com/ipython/ipython/wiki?path=Cookbook>`_ details more things
-you can do with IPython.
-
-.. This is not in the current version:
+<https://github.com/ipython/ipython/wiki/Cookbook%3A-Index>`_ details more
+things you can do with IPython.
 
 
 Embed IPython in your programs
@@ -99,4 +97,3 @@ Continuing with the example above, this should illustrate this idea::
 
 This section was written after a contribution by Alexander Belchenko on
 the IPython user list.
-

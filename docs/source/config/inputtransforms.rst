@@ -13,7 +13,7 @@ interactive interface. Using them carelessly can easily break IPython!
 String based transformations
 ============================
 
-.. currentmodule:: IPython.core.inputtransformers2
+.. currentmodule:: IPython.core.inputtransformer2
 
 When the user enters code, it is first processed as a string. By the
 end of this stage, it must be valid Python syntax.
@@ -40,7 +40,7 @@ Each group is a list of transformation functions.
   points.
 * ``input_transformers_post`` run as the last step, to do things like converting
   float literals into decimal objects. These may attempt to parse the input as
-  Python code.  
+  Python code.
 
 These transformers may raise :exc:`SyntaxError` if the input code is invalid, but
 in most cases it is clearer to pass unrecognised code through unmodified and let
@@ -66,7 +66,7 @@ To start using this::
 
     input_transformers can now have an attribute ``has_side_effects`` set to
     `True`, which will prevent the transformers from being ran when IPython is
-    trying to guess whether the user input is complete. 
+    trying to guess whether the user input is complete.
 
 
 
@@ -83,7 +83,7 @@ mathematical frameworks that want to handle e.g. ``1/3`` as a precise fraction::
 
     class IntegerWrapper(ast.NodeTransformer):
         """Wraps all integers in a call to Integer()"""
-        def visit_Num(self, node):
+        def visit_Constant(self, node):
             if isinstance(node.value, int):
                 return ast.Call(func=ast.Name(id='Integer', ctx=ast.Load()),
                                 args=[node], keywords=[])

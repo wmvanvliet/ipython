@@ -1,4 +1,3 @@
-# encoding: utf-8
 """
 Utilities for path handling.
 """
@@ -38,7 +37,7 @@ if sys.platform == 'win32':
         """
         try:
             import ctypes
-        except ImportError as e: 
+        except ImportError as e:
             raise ImportError('you need to have ctypes installed for this to work') from e
         _GetLongPathName = ctypes.windll.kernel32.GetLongPathNameW
         _GetLongPathName.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p,
@@ -87,7 +86,7 @@ def get_py_filename(name):
         py_name = name + ".py"
         if os.path.isfile(py_name):
             return py_name
-    raise IOError("File `%r` not found." % name)
+    raise OSError("File `%r` not found." % name)
 
 
 def filefind(filename: str, path_dirs=None) -> str:
@@ -145,7 +144,7 @@ def filefind(filename: str, path_dirs=None) -> str:
         if os.path.isfile(testname):
             return os.path.abspath(testname)
 
-    raise IOError("File %r does not exist in any of the search paths: %r" %
+    raise OSError("File %r does not exist in any of the search paths: %r" %
                   (filename, path_dirs) )
 
 
@@ -186,7 +185,7 @@ def get_home_dir(require_writable: bool=False) -> str:
                 r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
             ) as key:
                 homedir = wreg.QueryValueEx(key,'Personal')[0]
-        except:
+        except Exception:
             pass
 
     if (not require_writable) or _writable_dir(homedir):
@@ -261,7 +260,7 @@ def unescape_glob(string):
     """Unescape glob pattern in `string`."""
     def unescape(s):
         for pattern in '*[]!?':
-            s = s.replace(r'\{0}'.format(pattern), pattern)
+            s = s.replace(fr'\{pattern}', pattern)
         return s
     return '\\'.join(map(unescape, string.split('\\\\')))
 
@@ -324,7 +323,7 @@ def link_or_copy(src, dst):
         new_dst = dst + "-temp-%04X" %(random.randint(1, 16**4), )
         try:
             link_or_copy(src, new_dst)
-        except:
+        except Exception:
             try:
                 os.remove(new_dst)
             except OSError:
@@ -351,4 +350,4 @@ def ensure_dir_exists(path: str, mode: int=0o755):
             if e.errno != errno.EEXIST:
                 raise
     elif not os.path.isdir(path):
-        raise IOError("%r exists but is not a directory" % path)
+        raise OSError("%r exists but is not a directory" % path)

@@ -2,7 +2,6 @@
 
 from base64 import b64encode, b64decode
 import sys
-from typing import Union
 
 def _supports_kitty_graphics() -> bool:
     import platform
@@ -10,7 +9,8 @@ def _supports_kitty_graphics() -> bool:
     if platform.system() not in ("Darwin", "Linux"):
         return False
 
-    if not sys.stdout.isatty():
+    isatty = getattr(sys.stdout, "isatty", None)
+    if not callable(isatty) or not isatty():
         return False
     # Hardcoding process names instead of using
     # https://sw.kovidgoyal.net/kitty/graphics-protocol/#querying-support-and-available-transmission-mediums
@@ -26,10 +26,18 @@ def _supports_kitty_graphics() -> bool:
     }
     import psutil
 
-    process = psutil.Process()
-    while process := process.parent():
-        if process.name() in supported_terminals:
-            return True
+    try:
+        process = psutil.Process()
+        while process := process.parent():
+            if process.name() in supported_terminals:
+                return True
+    except (psutil.Error, OSError):
+        # Walking the process tree can fail when /proc is mounted with
+        # ``hidepid`` on shared multi-user systems (common on HPC clusters):
+        # ancestor processes owned by other users are inaccessible and psutil
+        # raises AccessDenied. Treat as "unsupported" rather than letting it
+        # abort the import of IPython.
+        return False
     return False
 
 
@@ -55,7 +63,7 @@ def png_to_kitty_ansi(png: bytes) -> str:
     return "".join(result)
 
 
-def kitty_png_render(png: Union[bytes, str], _md_dict: object) -> None:
+def kitty_png_render(png: bytes | str, _md_dict: object) -> None:
     if isinstance(png, str):
         png = png_to_kitty_ansi(b64decode(png))
     else:

@@ -35,7 +35,7 @@ You can then configure class attributes like this::
     c.InteractiveShell.automagic = False
 
 Be careful with spelling--incorrect names will simply be ignored, with
-no error. 
+no error.
 
 To add to a collection which may have already been defined elsewhere or have
 default values, you can use methods like those found on lists, dicts and
@@ -56,7 +56,7 @@ Example configuration file
     # sample ipython_config.py
 
     c.TerminalIPythonApp.display_banner = True
-    c.InteractiveShellApp.log_level = 20
+    c.Application.log_level = 20
     c.InteractiveShellApp.extensions = [
         'myextension'
     ]
@@ -84,7 +84,7 @@ JSON Configuration files
 
 In case where executability of configuration can be problematic, or
 configurations need to be modified programmatically, IPython also support a
-limited set of functionalities via ``.json`` configuration files. 
+limited set of functionalities via ``.json`` configuration files.
 
 You can define most of the configuration options via a JSON object whose
 hierarchy represents the value you would normally set on the ``c`` object of
@@ -92,7 +92,7 @@ hierarchy represents the value you would normally set on the ``c`` object of
 
     {
         "InteractiveShell": {
-            "colors": "lightbg",
+            "colors": "lightbg"
         },
         "InteractiveShellApp": {
             "extensions": [
@@ -139,7 +139,7 @@ The config magic
 
 You can also modify config from inside IPython, using a magic command::
 
-    %config IPCompleter.greedy = True
+    %config IPCompleter.use_jedi = False
 
 At present, this only affects the current session - changes you make to
 config are not saved anywhere. Also, some options are only read when
@@ -150,9 +150,9 @@ IPython starts, so they can't be changed like this.
 Running IPython from Python
 ----------------------------
 
-If you are using :ref:`embedding` to start IPython from a normal 
-python file, you can set configuration options the same way as in a 
-config file by creating a traitlets :class:`Config` object and passing it to 
+If you are using :ref:`embedding` to start IPython from a normal
+python file, you can set configuration options the same way as in a
+config file by creating a traitlets :class:`Config` object and passing it to
 start_ipython like in the example below.
 
 .. literalinclude:: ../../../examples/Embedding/start_ipython_config.py
@@ -217,7 +217,7 @@ search in distribution specific location, for example:
 
 In those locations, Terminal IPython will look for a file called
 ``ipython_config.py`` and ``ipython_config.json``, ipykernel will look for
-``ipython_kernel_config.py`` and ``ipython_kernel.json``.
+``ipython_kernel_config.py`` and ``ipython_kernel_config.json``.
 
 Configuration files are loaded in order and merged with configuration on
 later location taking precedence on earlier locations (that is to say a user
@@ -230,5 +230,5 @@ by starting ipython in debug mode::
 
 Identically with ipykernel though the command is currently blocking until
 this process is killed with ``Ctrl-\``::
- 
+
     $ python -m ipykernel --debug

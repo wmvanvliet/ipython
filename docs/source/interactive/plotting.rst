@@ -44,7 +44,7 @@ running within Jupyter or not.
 
 Alternatively, the backend can be explicitly requested using, for example::
 
-  %matplotlib gtk
+  %matplotlib qt
 
 The argument passed to the ``%matplotlib`` magic command may be the name of any
 backend understood by ``matplotlib`` or it may the name of a GUI loop such as
@@ -68,10 +68,6 @@ There are some specific backends that are used in the Jupyter ecosystem:
   ``notebook >=7``. It is in a separate ``ipympl`` module that must be
   installed using ``pip`` or ``conda`` in the usual manner. Plots are
   interactive so they can be zoomed and panned.
-
-.. seealso::
-
-    `Plotting with Matplotlib`_  example notebook
 
 See the matplotlib_ documentation for more information, in particular the
 section on backends.

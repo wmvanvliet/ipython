@@ -130,9 +130,8 @@ import re
 import sys
 import warnings
 from contextlib import contextmanager
-from functools import lru_cache
 
-from IPython import get_ipython
+from IPython.core.getipython import get_ipython
 from IPython.core.debugger_backport import PdbClosureBackport
 from IPython.utils import PyColorize
 from IPython.utils.PyColorize import TokenStream
@@ -243,6 +242,8 @@ class Pdb(OldPdb):
         stdin=None,
         stdout=None,
         context: int | None | str = 5,
+        *,
+        mode: str | None = None,
         **kwargs,
     ):
         """Create a new IPython debugger.
@@ -258,6 +259,13 @@ class Pdb(OldPdb):
         context : int
             Number of lines of source code context to show when
             displaying stacktrace information.
+        mode : str, optional
+            How the debugger was invoked, one of ``'inline'`` (used by the
+            ``breakpoint()`` builtin), ``'cli'`` (used by the command line
+            invocation) or ``None`` (backwards compatible behaviour). This
+            argument was added to stdlib's ``pdb.Pdb`` in Python 3.14; it is
+            accepted on every supported Python version here but only forwarded
+            to the underlying ``pdb.Pdb`` when it is actually supported.
         **kwargs
             Passed to pdb.Pdb.
 
@@ -273,6 +281,15 @@ class Pdb(OldPdb):
             context = int(context)
         self.context = context
 
+        # The `mode` argument was added to `pdb.Pdb` in Python 3.14. We accept
+        # it on every supported Python version so that callers written against
+        # 3.14+ keep working, but only forward it to the underlying `pdb.Pdb`
+        # when it understands it.
+        if sys.version_info >= (3, 14):
+            kwargs["mode"] = mode
+        else:
+            self.mode = mode
+
         # `kwargs` ensures full compatibility with stdlib's `pdb.Pdb`.
         OldPdb.__init__(self, completekey, stdin, stdout, **kwargs)
         # Python 3.15+ should define this, so no need to initialize
@@ -281,17 +298,18 @@ class Pdb(OldPdb):
             self.curframe = None
 
         # IPython changes...
-        self.shell = get_ipython()
+        shell = get_ipython()
 
-        if self.shell is None:
+        if shell is None:
             save_main = sys.modules["__main__"]
             # No IPython instance running, we must create one
             from IPython.terminal.interactiveshell import TerminalInteractiveShell
 
-            self.shell = TerminalInteractiveShell.instance()
+            shell = TerminalInteractiveShell.instance()
             # needed by any code which calls __import__("__main__") after
             # the debugger was entered. See also #9941.
             sys.modules["__main__"] = save_main
+        self.shell = shell
 
         self.aliases = {}
 
@@ -311,6 +329,14 @@ class Pdb(OldPdb):
 
         # list of predicates we use to skip frames
         self._predicates = self.default_predicates
+
+        # Per-instance caches for the DEBUGGERSKIP frame checks (see
+        # `_cachable_skip`). Keyed by frame objects, so they must not outlive
+        # the debugger stop they were computed for: they are cleared on every
+        # `interaction` (and size-bounded) to avoid pinning frames — and
+        # transitively their locals and whole back-chains — in memory.
+        self._skip_cache: dict[FrameType, bool] = {}
+        self._parent_skip_cache: dict[FrameType, bool | None] = {}
 
         if CHAIN_EXCEPTIONS:
             self._chained_exceptions = tuple()
@@ -351,11 +377,11 @@ class Pdb(OldPdb):
         self._theme_name = scheme.lower()
         self.parser.theme_name = scheme.lower()
 
-    def set_trace(self, frame=None):
+    def set_trace(self, frame=None, **kwargs):
         if frame is None:
             frame = sys._getframe().f_back
         self.initial_frame = frame
-        return super().set_trace(frame)
+        return super().set_trace(frame, **kwargs)
 
     def get_stack(self, *args, **kwargs):
         stack, pos = super().get_stack(*args, **kwargs)
@@ -476,6 +502,7 @@ class Pdb(OldPdb):
             chain. Exceptions will be numbered, with the current exception indicated
             with an arrow.
             If given an integer as argument, switch to the exception at that index.
+            ``exception`` can be used as an alias for this command.
             """
             if not self._chained_exceptions:
                 self.message(
@@ -515,7 +542,30 @@ class Pdb(OldPdb):
                 else:
                     self.error("No exception with that number")
 
+        def do_exception(self, arg):
+            """exception [number]
+            Alias for the ``exceptions`` command.
+            """
+            return self.do_exceptions(arg)
+
+    def _cmdloop(self):
+        # Override to bypass Python 3.15's _maybe_use_pyrepl_as_stdin(), which
+        # sets use_rawinput=False and conflicts with IPython's own input handling.
+        while True:
+            try:
+                self.allow_kbdint = True
+                self.cmdloop()
+                self.allow_kbdint = False
+                break
+            except KeyboardInterrupt:
+                self.message("--KeyboardInterrupt--")
+
     def interaction(self, frame, tb_or_exc):
+        # The DEBUGGERSKIP caches are only valid for a single stop: frame
+        # locals may change while the program runs, and keeping frame keys
+        # alive across stops would leak memory (see `_cachable_skip`).
+        self._skip_cache.clear()
+        self._parent_skip_cache.clear()
         try:
             if CHAIN_EXCEPTIONS:
                 # this context manager is part of interaction in 3.13
@@ -596,6 +646,19 @@ class Pdb(OldPdb):
         filename = frame.f_code.co_filename
         self.shell.hooks.synchronize_with_editor(filename, lineno, 0)
 
+    def _pdbcmd_print_frame_status(self, arg):
+        """Use print_stack_entry to print frames in Python 3.14+."""
+        if sys.version_info[:2] >= (3, 14):
+            # This is the only line changed from the base class.
+            self.print_stack_entry(self.stack[self.curindex])
+
+            # Same as in 3.14
+            self._validate_file_mtime()
+            self._show_display()
+        else:
+            # 3.13 and 3.12 don't need any changes.
+            super()._pdbcmd_print_frame_status(arg) # type: ignore[misc]
+
     def _get_frame_locals(self, frame):
         """ "
         Accessing f_local of current frame reset the namespace, so we want to avoid
@@ -620,7 +683,7 @@ class Pdb(OldPdb):
 
     def format_stack_entry(
         self,
-        frame_lineno: tuple[FrameType, int],  # type: ignore[override] # stubs are wrong
+        frame_lineno: tuple[FrameType, int],
         lprefix: str = ": ",
     ) -> str:
         """
@@ -749,7 +812,7 @@ class Pdb(OldPdb):
         if arrow:
             # This is the line with the error
             pad = numbers_width - len(str(lineno)) - len(bp_mark)
-            num = "%s%s" % (self.theme.make_arrow(pad), str(lineno))
+            num = "{}{}".format(self.theme.make_arrow(pad), str(lineno))
         else:
             num = "%*s" % (numbers_width - len(bp_mark), str(lineno))
         bp_str = (BreakpointToken, bp_mark)
@@ -875,14 +938,14 @@ class Pdb(OldPdb):
                 x = eval(arg, {}, {})
                 if type(x) == type(()):
                     first, last = x  # type: ignore[misc]
-                    first = int(first)  # type: ignore[call-overload]
+                    first = int(first)
                     last = int(last)  # type: ignore[call-overload]
                     if last < first:
                         # Assume it's a count
                         last = first + last
                 else:
                     first = max(1, int(x) - 5)
-            except:
+            except ValueError:
                 print("*** Error in argument:", repr(arg), file=self.stdout)
                 return
         elif self.lineno is None or arg == ".":
@@ -1064,7 +1127,6 @@ class Pdb(OldPdb):
 
         return self._cachable_skip(frame)
 
-    @lru_cache(1024)
     def _cached_one_parent_frame_debuggerskip(self, frame):
         """
         Cache looking up for DEBUGGERSKIP on parent frame.
@@ -1074,23 +1136,42 @@ class Pdb(OldPdb):
 
         This is likely to introduce fake positive though.
         """
-        while getattr(frame, "f_back", None):
-            frame = frame.f_back
-            if self._get_frame_locals(frame).get(DEBUGGERSKIP):
-                return True
-        return None
+        try:
+            return self._parent_skip_cache[frame]
+        except KeyError:
+            pass
+        result = None
+        current = frame
+        while getattr(current, "f_back", None):
+            current = current.f_back
+            if self._get_frame_locals(current).get(DEBUGGERSKIP):
+                result = True
+                break
+        self._parent_skip_cache[frame] = result
+        return result
 
-    @lru_cache(1024)
     def _cachable_skip(self, frame):
+        # These caches used to be class-level ``lru_cache``\ s, which kept
+        # every debugger instance and up to 1024 frames (plus their locals and
+        # back-chains) alive for the lifetime of the process. They are now
+        # per-instance, size-bounded here, and cleared on each `interaction`.
+        if len(self._skip_cache) >= 1024:
+            self._skip_cache.clear()
+            self._parent_skip_cache.clear()
+        try:
+            return self._skip_cache[frame]
+        except KeyError:
+            pass
+
         # if frame is tagged, skip by default.
         if DEBUGGERSKIP in frame.f_code.co_varnames:
-            return True
+            result = True
+        else:
+            # if one of the parent frame value set to True skip as well.
+            result = bool(self._cached_one_parent_frame_debuggerskip(frame))
 
-        # if one of the parent frame value set to True skip as well.
-        if self._cached_one_parent_frame_debuggerskip(frame):
-            return True
-
-        return False
+        self._skip_cache[frame] = result
+        return result
 
     def stop_here(self, frame):
         if self._is_in_decorator_internal_and_should_skip(frame) is True:

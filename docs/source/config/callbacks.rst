@@ -27,6 +27,7 @@ For example::
             print('info.silent =', info.silent)
             print('info.shell_futures =', info.shell_futures)
             print('info.cell_id =', info.cell_id)
+            print('info.cell_meta =', info.cell_meta)
             print(dir(info))
 
         def post_execute(self):
@@ -50,8 +51,8 @@ For example::
 .. versionadded:: 8.3
 
    Since IPython 8.3 and ipykernel 6.12.1, the ``info`` objects in the callback
-   now have a the ``cell_id`` that will be set to the value sent by the
-   frontened, when those send it.
+   now have a ``cell_id`` attribute that will be set to the value sent by the
+   frontend, when those send it.
 
 
 
@@ -68,8 +69,10 @@ shell_initialized
     def shell_initialized(ipython):
         ...
 
-This event is triggered only once, at the end of setting up IPython.
-Extensions registered to load by default as part of configuration can use this to execute code to finalize setup.
+This event is triggered only once, at the end of shell initialization, before
+extensions and startup files are loaded. As a consequence it can only be
+registered by subclassing :class:`~IPython.core.interactiveshell.InteractiveShell`;
+extensions load too late to observe it.
 Callbacks will be passed the InteractiveShell instance.
 
 pre_run_cell
@@ -107,7 +110,7 @@ but fires for *all* executions, not just interactive ones.
    Module :mod:`IPython.core.hooks`
      The older 'hooks' system allows end users to customise some parts of
      IPython's behaviour.
-   
+
    :doc:`inputtransforms`
      By registering input transformers that don't change code, you can monitor
      what is being executed.
