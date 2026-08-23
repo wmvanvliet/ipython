@@ -3,16 +3,13 @@
 # Copyright (c) IPython Development Team.
 # Distributed under the terms of the Modified BSD License.
 
-import asyncio
-import asyncio.exceptions
 import atexit
 import errno
 import os
-import signal
 import sys
 import time
+import weakref
 from codecs import getincrementaldecoder
-from subprocess import CalledProcessError
 from threading import Thread
 
 from traitlets import Any, Dict, List, default
@@ -21,6 +18,8 @@ from IPython.core import magic_arguments
 from IPython.core.async_helpers import _AsyncIOProxy
 from IPython.core.magic import Magics, cell_magic, line_magic, magics_class
 from IPython.utils.process import arg_split
+
+from ._table import default_script_magics
 
 #-----------------------------------------------------------------------------
 # Magic implementation classes
@@ -104,23 +103,9 @@ class ScriptMagics(Magics):
     @default('script_magics')
     def _script_magics_default(self):
         """default to a common list of programs"""
-
-        defaults = [
-            'sh',
-            'bash',
-            'perl',
-            'ruby',
-            'python',
-            'python2',
-            'python3',
-            'pypy',
-        ]
-        if os.name == 'nt':
-            defaults.extend([
-                'cmd',
-            ])
-
-        return defaults
+        # In `_table` so the lazy declaration can name these without
+        # importing this module.
+        return default_script_magics()
 
     script_paths = Dict(
         help="""Dict mapping short 'ruby' names to full paths, such as '/opt/secret/bin/ruby'
@@ -134,10 +119,42 @@ class ScriptMagics(Magics):
         super().__init__(shell=shell)
         self._generate_script_magics()
         self.bg_processes = []
+        self._event_loop_finalizer = None
         atexit.register(self.kill_bg_processes)
 
     def __del__(self):
         self.kill_bg_processes()
+
+    @staticmethod
+    def _shutdown_event_loop(event_loop, thread):
+        """Stop ``event_loop``, wait for ``thread`` to notice, and close it.
+
+        Kept free of any reference to the ``ScriptMagics`` instance so it can
+        be handed to :func:`weakref.finalize` without keeping that instance
+        alive.
+        """
+        if not event_loop.is_closed():
+            event_loop.call_soon_threadsafe(event_loop.stop)
+            thread.join()
+            event_loop.close()
+
+    def stop_event_loop(self):
+        """Stop the background event loop and the thread running it.
+
+        The loop is started lazily by ``shebang`` and then kept around to be
+        reused; this is the deterministic way to shut it back down. Without it
+        the thread lives until the process exits, which leaves the loop (and
+        the socketpair it uses for its self-pipe) unclosed, and keeps the
+        process multi-threaded, which ``os.fork()`` warns about since
+        Python 3.12. Safe to call more than once.
+
+        The same shutdown runs on its own if this object is garbage collected,
+        and at interpreter exit, through the finalizer ``shebang`` registers.
+        """
+        finalizer, self._event_loop_finalizer = self._event_loop_finalizer, None
+        self.event_loop = None
+        if finalizer is not None:
+            finalizer()
 
     def _generate_script_magics(self):
         cell_magics = self.magics['cell']
@@ -196,6 +213,9 @@ class ScriptMagics(Magics):
             2
             3
         """
+        import asyncio
+        import asyncio.exceptions
+        from subprocess import CalledProcessError
 
         # Create the event loop in which to run script magics
         # this operates on a background thread
@@ -211,6 +231,11 @@ class ScriptMagics(Magics):
             # start the loop in a background thread
             asyncio_thread = Thread(target=event_loop.run_forever, daemon=True)
             asyncio_thread.start()
+            # ... and make sure it is stopped again, at the latest when we are
+            # collected or the interpreter exits
+            self._event_loop_finalizer = weakref.finalize(
+                self, self._shutdown_event_loop, event_loop, asyncio_thread
+            )
         else:
             event_loop = self.event_loop
 
@@ -308,6 +333,7 @@ class ScriptMagics(Magics):
             in_thread(_stream_communicate(p, cell))
         except KeyboardInterrupt:
             try:
+                import signal
                 p.send_signal(signal.SIGINT)
                 in_thread(asyncio.wait_for(p.wait(), timeout=0.1))
                 if p.returncode is not None:
@@ -375,6 +401,7 @@ class ScriptMagics(Magics):
         for p in self.bg_processes:
             if p.returncode is None:
                 try:
+                    import signal
                     p.send_signal(signal.SIGINT)
                 except OSError:
                     pass

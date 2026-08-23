@@ -182,10 +182,14 @@ def test_check_make_token_by_line_never_ends_empty():
     """
     from string import printable
 
-    for c in printable:
-        assert make_tokens_by_line(c)[-1] != []
-        for k in printable:
-            assert make_tokens_by_line(c + k)[-1] != []
+    # Most of the two-character combinations below are missing a line
+    # ending, which `make_tokens_by_line` deliberately warns about; assert
+    # on that warning instead of letting it leak into the test output.
+    with pytest.warns(UserWarning, match="do not have lineending markers"):
+        for c in printable:
+            assert make_tokens_by_line(c)[-1] != []
+            for k in printable:
+                assert make_tokens_by_line(c + k)[-1] != []
 
 
 def check_find(transformer, case, match=True):
@@ -315,6 +319,17 @@ examples = [
     pytest.param("for a in range(5):", "incomplete", 4),
     pytest.param("for a in range(5):\n    if a > 0:", "incomplete", 8),
     pytest.param("raise = 2", "invalid", None),
+    # Invalid number literals (ipython/ipython#15320): on Python <= 3.11 the
+    # tokenizer splits these into separate tokens and compilation fails;
+    # since Python 3.12 the tokenizer raises TokenError for malformed
+    # literals, which must be surfaced as a syntax error, not mistaken for
+    # incomplete input (0x123g is "invalid" on every version via the
+    # compile path; it guards the surrounding tokenizer-regression rows).
+    pytest.param("0b12", "invalid", None),
+    pytest.param("0o1239", "invalid", None),
+    pytest.param("0x123g", "invalid", None),
+    pytest.param("0b12+1", "invalid", None),
+    pytest.param("(0b12)", "invalid", None),
     pytest.param("a = [1,\n2,", "incomplete", 0),
     extra_closing_paren_param,
     pytest.param("\\\r\n", "incomplete", 0),

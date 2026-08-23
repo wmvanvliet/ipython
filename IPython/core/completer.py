@@ -192,8 +192,6 @@ import string
 import sys
 import tokenize
 import time
-import unicodedata
-import uuid
 import warnings
 from ast import literal_eval
 from collections import defaultdict
@@ -210,14 +208,12 @@ from typing import (
 )
 from collections.abc import Iterable, Iterator, Sequence, Sized
 
-from IPython.core.guarded_eval import (
-    guarded_eval,
-    EvaluationContext,
-    _validate_policy_overrides,
-)
 from IPython.core.error import TryNext, UsageError
-from IPython.core.inputtransformer2 import ESC_MAGIC
-from IPython.core.latex_symbols import latex_symbols, reverse_latex_symbol
+from IPython.core.inputtransformer2 import (
+    ESC_MAGIC,
+    SystemAssign,
+    make_tokens_by_line,
+)
 from IPython.testing.skipdoctest import skip_doctest
 from IPython.utils import generics
 from IPython.utils.PyColorize import theme_table
@@ -265,6 +261,19 @@ def _get_jedi() -> ModuleType:
     import jedi.api.helpers
 
     jedi.settings.case_insensitive_completion = False
+
+    # parso, which jedi parses with, logs copiously at DEBUG level; without
+    # this those records reach the user's session whenever IPython runs with
+    # a debug log level. This lived at the top of `IPython.core.logger` --
+    # a module about `%logstart` session transcripts, nothing to do with
+    # jedi -- where it worked only because that module happened to be
+    # imported eagerly at startup. Configure it where jedi itself is
+    # configured instead, which is still before any parso record can be
+    # emitted, since parso is only reached through jedi.
+    import logging
+
+    logging.getLogger("parso").setLevel(logging.WARNING)
+
     return jedi
 
 
@@ -510,7 +519,7 @@ class Completion:
     ``IPython.python_matches``, ``IPython.magics_matches``...).
     """
 
-    __slots__ = ['start', 'end', 'text', 'type', 'signature', '_origin']
+    __slots__ = ["_origin", "end", "signature", "start", "text", "type"]
 
     def __init__(
         self,
@@ -1060,12 +1069,16 @@ class Completer(Configurable):
 
     @observe("evaluation")
     def _evaluation_changed(self, _change):
+        from IPython.core.guarded_eval import _validate_policy_overrides
+
         _validate_policy_overrides(
             policy_name=self.evaluation, policy_overrides=self.policy_overrides
         )
 
     @observe("policy_overrides")
     def _policy_overrides_changed(self, _change):
+        from IPython.core.guarded_eval import _validate_policy_overrides
+
         _validate_policy_overrides(
             policy_name=self.evaluation, policy_overrides=self.policy_overrides
         )
@@ -1145,6 +1158,8 @@ class Completer(Configurable):
         defined in self.namespace or self.global_namespace that match.
 
         """
+        from IPython.core.guarded_eval import EvaluationContext, guarded_eval
+
         matches = []
         match_append = matches.append
         n = len(text)
@@ -1370,6 +1385,8 @@ class Completer(Configurable):
         return ""
 
     def _evaluate_expr(self, expr):
+        from IPython.core.guarded_eval import EvaluationContext, guarded_eval
+
         obj = not_found
         done = False
         while not done and expr:
@@ -1762,6 +1779,8 @@ def back_unicode_name_matches(text: str) -> tuple[str, Sequence[str]]:
     - a sequence (of 1), name for the match Unicode character, preceded by
         backslash, or empty if no match.
     """
+    import unicodedata
+
     if len(text)<2:
         return '', ()
     maybe_slash = text[-2]
@@ -1787,6 +1806,8 @@ def back_latex_name_matcher(context: CompletionContext) -> SimpleMatcherResult:
 
     This does ``\\ℵ`` -> ``\\aleph``
     """
+    from IPython.core.latex_symbols import reverse_latex_symbol
+
 
     text = context.text_until_cursor
     no_match = {
@@ -2199,9 +2220,22 @@ class IPCompleter(Completer):
         #  starts with `/home/`, `C:\`, etc)
 
         text = context.token
-        code_until_cursor = self._extract_code(context.text_until_cursor)
+        raw_text_until_cursor = context.text_until_cursor
+        code_until_cursor = self._extract_code(raw_text_until_cursor)
+        in_cli_context = self._is_completing_in_cli_context(
+            raw_text_until_cursor
+        ) or self._is_completing_in_cli_context(code_until_cursor)
+        if (
+            not in_cli_context
+            and not self._is_completing_in_string(code_until_cursor)
+            and not self._looks_like_path(text)
+        ):
+            return {
+                "completions": [],
+                "suppress": False,
+            }
+
         completion_type = self._determine_completion_context(code_until_cursor)
-        in_cli_context = self._is_completing_in_cli_context(code_until_cursor)
         if (
             completion_type == self._CompletionContextType.ATTRIBUTE
             and not in_cli_context
@@ -2415,6 +2449,8 @@ class IPCompleter(Completer):
         texts = text.strip().split()
 
         if len(texts) > 0 and (texts[0] == 'config' or texts[0] == '%config'):
+            # Only instantiated magics are configurable; load the lazy ones.
+            self.shell.magics_manager.load_all_lazy_magics()
             # get all configuration classes
             classes = sorted({ c for c in self.shell.configurables
                                    if c.__class__.class_traits(config=True)
@@ -2610,6 +2646,8 @@ class IPCompleter(Completer):
         stripped = text.lstrip()
         if stripped.startswith("!") or stripped.startswith("%"):
             return True
+        if self._is_completing_in_system_assignment(text):
+            return True
         # Check for CLI aliases
         try:
             tokens = stripped.split(None, 1)
@@ -2637,6 +2675,26 @@ class IPCompleter(Completer):
             return True
         except Exception:
             return False
+
+    def _is_completing_in_system_assignment(self, text: str) -> bool:
+        """Return True for IPython ``name = !command`` syntax."""
+        try:
+            transform = SystemAssign.find(make_tokens_by_line([text + "\n"]))
+        except Exception:
+            return False
+        return transform is not None and transform.start_col < len(text)
+
+    def _is_completing_in_string(self, text: str) -> bool:
+        """Return True if the cursor is in a string literal, not a comment."""
+        is_string, is_in_expression = self._is_in_string_or_comment(text)
+        if not is_string or is_in_expression:
+            return False
+        return not any(token.type == tokenize.COMMENT for token in _parse_tokens(text))
+
+    def _looks_like_path(self, text: str) -> bool:
+        if text.startswith(("~", "/", "./", "../", ".\\", "..\\")):
+            return True
+        return bool(sys.platform == "win32" and re.match(r"^[a-zA-Z]:[\\/]", text))
 
     def _is_in_string_or_comment(self, text):
         """
@@ -2986,6 +3044,7 @@ class IPCompleter(Completer):
         .. deprecated:: 8.6
             You can use :meth:`dict_key_matcher` instead.
         """
+        from IPython.core.guarded_eval import EvaluationContext, guarded_eval
 
         # Short-circuit on closed dictionary (regular expression would
         # not match anyway, but would take quite a while).
@@ -3109,6 +3168,8 @@ class IPCompleter(Completer):
         Works only on valid python 3 identifier, or on combining characters that
         will combine to form a valid identifier.
         """
+        import unicodedata
+
 
         text = context.text_until_cursor
 
@@ -3150,6 +3211,8 @@ class IPCompleter(Completer):
         .. deprecated:: 8.6
             You can use :meth:`latex_name_matcher` instead.
         """
+        from IPython.core.latex_symbols import latex_symbols
+
         slashpos = text.rfind('\\')
         if slashpos > -1:
             s = text[slashpos:]
@@ -3277,6 +3340,8 @@ class IPCompleter(Completer):
             completions are coming from different sources this function does not
             ensure that each completion object will only be present once.
         """
+        import uuid
+
         warnings.warn("_complete is a provisional API (as of IPython 6.0). "
                       "It may change without warnings. "
                       "Use in corresponding context manager.",
@@ -3793,6 +3858,8 @@ class IPCompleter(Completer):
 
         The list is lazily initialized on first access.
         """
+        import unicodedata
+
         if self._unicode_names is None:
             names = []
             for c in range(0,0x10FFFF + 1):
@@ -3806,6 +3873,8 @@ class IPCompleter(Completer):
 
 
 def _unicode_name_compute(ranges: list[tuple[int, int]]) -> list[str]:
+    import unicodedata
+
     names = []
     for start,stop in ranges:
         for c in range(start, stop) :

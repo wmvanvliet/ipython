@@ -13,7 +13,13 @@ from warnings import warn
 from traitlets.utils.importstring import import_item
 from IPython.core import magic_arguments, page
 from IPython.core.error import UsageError
-from IPython.core.magic import Magics, magics_class, line_magic, magic_escapes
+from IPython.core.magic import (
+    LazyMagic,
+    Magics,
+    magics_class,
+    line_magic,
+    magic_escapes,
+)
 from IPython.utils.text import format_screen, dedent, indent
 from IPython.testing.skipdoctest import skip_doctest
 from IPython.utils.ipstruct import Struct
@@ -60,10 +66,14 @@ class MagicsDisplay:
             d = {}
             magic_dict[key] = d
             for name, obj in subdict.items():
-                try:
-                    classname = obj.__self__.__class__.__name__
-                except AttributeError:
-                    classname = 'Other'
+                if isinstance(obj, LazyMagic):
+                    # Not imported yet; the spec already names the class.
+                    classname = obj.spec.rpartition(":")[2] or "Other"
+                else:
+                    try:
+                        classname = obj.__self__.__class__.__name__
+                    except AttributeError:
+                        classname = "Other"
 
                 d[name] = classname
         return magic_dict
@@ -181,10 +191,21 @@ class BasicMagics(Magics):
                 magic_escapes['cell'], name,
                 magic_escapes['cell'], target, params_str))
 
+    @magic_arguments.magic_arguments()
+    @magic_arguments.argument(
+        "-j", "--json", action="store_true", help="Return the magic list as JSON."
+    )
     @line_magic
     def lsmagic(self, parameter_s=''):
-        """List currently available magic functions."""
-        return MagicsDisplay(self.shell.magics_manager, ignore=[])
+        """List currently available magic functions.
+
+        Use ``--json`` to return a JSON-compatible dictionary instead of text.
+        """
+        args = magic_arguments.parse_argstring(self.lsmagic, parameter_s)
+        display = MagicsDisplay(self.shell.magics_manager, ignore=[])
+        if args.json:
+            return display._jsonable()
+        return str(display)
 
     def _magic_docs(self, brief=False, rest=False):
         """Return docstrings from magic functions."""

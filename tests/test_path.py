@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import tempfile
+import importlib
 from contextlib import contextmanager
 from importlib import reload
 from os.path import abspath, join
@@ -27,25 +28,12 @@ from IPython.testing.decorators import (
 from IPython.testing.tools import make_tempfile
 from IPython.utils import path
 
-# Platform-dependent imports
-try:
-    import winreg as wreg
-except ImportError:
-    # Fake _winreg module on non-windows platforms
-    import types
-
-    wr_name = "winreg"
-    sys.modules[wr_name] = types.ModuleType(wr_name)
-    try:
-        import winreg as wreg
-    except ImportError:
-        import _winreg as wreg
-
-        # Add entries that needs to be stubbed by the testing code
-        (
-            wreg.OpenKey,
-            wreg.QueryValueEx,
-        ) = (None, None)
+# Platform-dependent imports. Only `test_get_home_dir_8` needs `winreg`, and
+# that test only runs on Windows; a stub module registered in `sys.modules`
+# here would stay there for the rest of the session, and any stdlib module
+# that probes for `winreg` later (`mimetypes` does) would find it and believe
+# it is running on Windows.
+wreg = importlib.import_module("winreg") if sys.platform == "win32" else None
 
 # -----------------------------------------------------------------------------
 # Globals
@@ -264,11 +252,11 @@ def test_get_xdg_dir_3(monkeypatch):
 
 def test_filefind():
     """Various tests for filefind"""
-    f = tempfile.NamedTemporaryFile()
-    # print('fname:',f.name)
-    alt_dirs = paths.get_ipython_dir()
-    t = path.filefind(f.name, alt_dirs)
-    # print('found:',t)
+    with tempfile.NamedTemporaryFile() as f:
+        # print('fname:',f.name)
+        alt_dirs = paths.get_ipython_dir()
+        t = path.filefind(f.name, alt_dirs)
+        # print('found:',t)
 
 
 @dec.skip_if_not_win32
@@ -484,3 +472,24 @@ def test_link_twice(link_or_copy_src, tmp_path):
     path.link_or_copy(str(link_or_copy_src), dst)
     path.link_or_copy(str(link_or_copy_src), dst)
     assert os.stat(str(link_or_copy_src)).st_ino == os.stat(dst).st_ino
+
+
+@skip_win32  # setting $HOME doesn't move expanduser("~"), as in test_get_home_dir_3
+@with_environment
+def test_compress_user(tmp_path):
+    """compress_user() only substitutes ~ on a path-component boundary."""
+    home = str(tmp_path / "alice")
+    env["HOME"] = home
+
+    assert path.compress_user(join(home, "proj", "foo.py")) == join(
+        "~", "proj", "foo.py"
+    )
+    assert path.compress_user(home) == "~"
+
+    # A path that merely shares a prefix with home is not under it, so it must
+    # come back untouched: "~-backup/lib" would expanduser to a different
+    # (nonexistent) user's home rather than back to where it started.
+    for sibling in (home + "-backup", home + "s"):
+        p = join(sibling, "lib", "foo.py")
+        assert path.compress_user(p) == p
+        assert os.path.expanduser(path.compress_user(p)) == p
